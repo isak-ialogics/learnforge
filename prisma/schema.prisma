@@ -36,7 +36,8 @@ model Subtopic {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  questions Question[]
+  questions        Question[]
+  practiceSessions PracticeSession[]
 
   @@unique([topicId, name])
 }
@@ -57,6 +58,8 @@ model Question {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  sessionAnswers SessionAnswer[]
+
   @@index([subtopicId])
   @@index([difficulty])
 }
@@ -65,4 +68,43 @@ enum QuestionType {
   MULTIPLE_CHOICE
   TRUE_FALSE
   SHORT_ANSWER
+}
+
+model PracticeSession {
+  id              String        @id @default(cuid())
+  subtopicId      String
+  subtopic        Subtopic      @relation(fields: [subtopicId], references: [id], onDelete: Cascade)
+  currentDifficulty Int         @default(3) // adaptive difficulty level
+  status          SessionStatus @default(ACTIVE)
+  totalQuestions   Int          @default(0)
+  correctAnswers   Int          @default(0)
+  streak          Int           @default(0) // consecutive correct (positive) or incorrect (negative)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  completedAt     DateTime?
+
+  answers         SessionAnswer[]
+
+  @@index([subtopicId])
+  @@index([status])
+}
+
+model SessionAnswer {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     PracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  givenAnswer String
+  isCorrect   Boolean
+  answeredAt  DateTime @default(now())
+
+  @@index([sessionId])
+  @@unique([sessionId, questionId])
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
 }
