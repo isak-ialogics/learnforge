@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  topics    Topic[]
+}
+
+model Topic {
+  id        String   @id @default(cuid())
+  name      String
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subtopics Subtopic[]
+
+  @@unique([subjectId, name])
+}
+
+model Subtopic {
+  id        String   @id @default(cuid())
+  name      String
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questions Question[]
+
+  @@unique([topicId, name])
+}
+
+model Question {
+  id         String   @id @default(cuid())
+  content    String
+  type       QuestionType @default(MULTIPLE_CHOICE)
+  difficulty Int      @default(3) // 1-5 scale
+  options    Json     // Array of { label: string, text: string }
+  answer     String   // Correct option label (e.g. "A") or free-text answer
+  explanation String? // Optional explanation for the correct answer
+  metadata   Json?    // Flexible metadata (source, curriculum ref, etc.)
+
+  subtopicId String
+  subtopic   Subtopic @relation(fields: [subtopicId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subtopicId])
+  @@index([difficulty])
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
