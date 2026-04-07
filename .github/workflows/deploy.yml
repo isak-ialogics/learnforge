@@ -46,7 +46,6 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: vars.VPS_DEPLOY_ENABLED == 'true'
     steps:
       - name: Set up SSH key
         run: |
