@@ -32,9 +32,8 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma schema + migrations for runtime migrate
+# Copy Prisma client (generated to src/generated/prisma)
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/src/generated ./src/generated
 
 USER nextjs
