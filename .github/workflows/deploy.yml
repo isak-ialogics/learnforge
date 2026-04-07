@@ -46,28 +46,15 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    if: vars.VPS_DEPLOY_ENABLED == 'true'
     steps:
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/vps_key
           chmod 600 ~/.ssh/vps_key
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Deploy to VPS
         run: |
-          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=no paperclip@${{ secrets.VPS_HOST }} << 'DEPLOY'
-            # Log in to GHCR if needed
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-
-            # Update the service (or create if first deploy)
-            if docker service inspect learnforge >/dev/null 2>&1; then
-              docker service update \
-                --image ghcr.io/${{ github.repository }}:latest \
-                --force \
-                learnforge
-            else
-              echo "Service does not exist yet. Run initial setup first."
-              exit 1
-            fi
-          DEPLOY
+          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=no paperclip@${{ secrets.VPS_HOST }} \
+            "docker service update --image ghcr.io/${{ github.repository }}:latest --force learnforge"
