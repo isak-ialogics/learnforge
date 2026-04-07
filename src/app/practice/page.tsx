@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Subtopic = {
   id: string;
@@ -21,8 +21,11 @@ type Subject = {
   topics: Topic[];
 };
 
-export default function PracticePage() {
+function PracticeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedSubtopicId = searchParams.get("subtopicId");
+
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
@@ -36,6 +39,13 @@ export default function PracticePage() {
       });
   }, []);
 
+  // Auto-start session when subtopicId is pre-selected from recommendations
+  useEffect(() => {
+    if (!preselectedSubtopicId || loading) return;
+    startSession(preselectedSubtopicId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectedSubtopicId, loading]);
+
   async function startSession(subtopicId: string) {
     setStarting(subtopicId);
     const res = await fetch("/api/sessions", {
@@ -47,10 +57,14 @@ export default function PracticePage() {
     router.push(`/practice/${session.id}`);
   }
 
-  if (loading) {
+  if (loading || (preselectedSubtopicId && starting)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-gray-500">Loading subjects...</p>
+        <p className="text-lg text-gray-500">
+          {preselectedSubtopicId && starting
+            ? "Starting recommended session..."
+            : "Loading subjects..."}
+        </p>
       </div>
     );
   }
@@ -111,5 +125,19 @@ export default function PracticePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PracticePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-lg text-gray-500">Loading subjects...</p>
+        </div>
+      }
+    >
+      <PracticeContent />
+    </Suspense>
   );
 }

@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { calculateMasteryScore, needsReview } from "@/lib/practice-engine";
+
+const RECENT_SESSION_COUNT = 3; // sessions to consider for recent accuracy
+const MAX_RECOMMENDATIONS = 5;
 
 // GET /api/dashboard — Aggregated learner stats across all sessions
 export async function GET() {
@@ -80,9 +84,68 @@ export async function GET() {
         : 0,
   }));
 
+  // Spaced repetition: compute recommendations
+  // Group completed sessions by subtopic (sessions are already sorted newest-first)
+  const completedBySubtopic = new Map<
+    string,
+    { session: typeof sessions[number]; accuracy: number }[]
+  >();
+
+  for (const s of sessions) {
+    if (s.status !== "COMPLETED" || s.totalQuestions === 0) continue;
+    const arr = completedBySubtopic.get(s.subtopicId) ?? [];
+    arr.push({
+      session: s,
+      accuracy: Math.round((s.correctAnswers / s.totalQuestions) * 100),
+    });
+    completedBySubtopic.set(s.subtopicId, arr);
+  }
+
+  const now = Date.now();
+  const recommendations: {
+    subtopicId: string;
+    subtopic: string;
+    topic: string;
+    subject: string;
+    masteryScore: number;
+    lastPracticedAt: string;
+    daysSinceLastPractice: number;
+    recentAccuracy: number;
+  }[] = [];
+
+  for (const [subtopicId, completed] of completedBySubtopic) {
+    const recent = completed.slice(0, RECENT_SESSION_COUNT);
+    const recentAccuracy =
+      recent.reduce((sum, r) => sum + r.accuracy, 0) / recent.length;
+
+    const lastSession = completed[0].session;
+    const lastPracticedAt = lastSession.completedAt ?? lastSession.updatedAt;
+    const daysSince =
+      (now - new Date(lastPracticedAt).getTime()) / (1000 * 60 * 60 * 24);
+
+    const masteryScore = calculateMasteryScore(recentAccuracy, daysSince);
+
+    if (needsReview(masteryScore)) {
+      recommendations.push({
+        subtopicId,
+        subtopic: lastSession.subtopic.name,
+        topic: lastSession.subtopic.topic.name,
+        subject: lastSession.subtopic.topic.subject.name,
+        masteryScore,
+        lastPracticedAt: lastPracticedAt.toISOString(),
+        daysSinceLastPractice: Math.floor(daysSince),
+        recentAccuracy: Math.round(recentAccuracy),
+      });
+    }
+  }
+
+  // Sort by mastery score ascending (most urgent first)
+  recommendations.sort((a, b) => a.masteryScore - b.masteryScore);
+
   return Response.json({
     overall: { totalSessions, totalQuestions, totalCorrect, accuracy },
     sessions: sessionList,
     subtopicStats,
+    recommendations: recommendations.slice(0, MAX_RECOMMENDATIONS),
   });
 }

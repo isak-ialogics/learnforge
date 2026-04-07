@@ -28,6 +28,17 @@ type SubtopicStat = {
   accuracy: number;
 };
 
+type Recommendation = {
+  subtopicId: string;
+  subtopic: string;
+  topic: string;
+  subject: string;
+  masteryScore: number;
+  lastPracticedAt: string;
+  daysSinceLastPractice: number;
+  recentAccuracy: number;
+};
+
 type DashboardData = {
   overall: {
     totalSessions: number;
@@ -37,6 +48,7 @@ type DashboardData = {
   };
   sessions: SessionRow[];
   subtopicStats: SubtopicStat[];
+  recommendations: Recommendation[];
 };
 
 function AccuracyBar({ value }: { value: number }) {
@@ -56,6 +68,28 @@ function AccuracyBar({ value }: { value: number }) {
       </div>
       <span className="text-sm font-medium text-gray-700 w-10 text-right">
         {value}%
+      </span>
+    </div>
+  );
+}
+
+function MasteryBar({ value }: { value: number }) {
+  const color =
+    value >= 70
+      ? "bg-green-500"
+      : value >= 40
+      ? "bg-yellow-500"
+      : "bg-red-400";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+        <div
+          className={`${color} h-1.5 rounded-full transition-all`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+      <span className="text-xs font-medium text-gray-500 w-8 text-right">
+        {value}
       </span>
     </div>
   );
@@ -103,6 +137,14 @@ function formatDate(iso: string) {
   });
 }
 
+function recencyLabel(days: number): string {
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +168,7 @@ export default function DashboardPage() {
 
   if (!data) return null;
 
-  const { overall, sessions, subtopicStats } = data;
+  const { overall, sessions, subtopicStats, recommendations } = data;
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -175,6 +217,51 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Recommended Practice */}
+        {recommendations.length > 0 && (
+          <div className="bg-white rounded-lg border border-amber-200 mb-8">
+            <div className="px-6 py-4 border-b border-amber-100 flex items-center gap-2">
+              <span className="text-amber-500 text-lg">&#9888;</span>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Recommended Practice
+              </h2>
+              <span className="ml-auto text-xs text-gray-400">
+                Topics that need review based on accuracy and recency
+              </span>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {recommendations.map((rec) => (
+                <div
+                  key={rec.subtopicId}
+                  className="px-6 py-4 flex items-center gap-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900">{rec.subtopic}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {rec.subject} › {rec.topic}
+                    </p>
+                    <div className="mt-2 max-w-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">Mastery</span>
+                        <span className="text-xs text-gray-400">
+                          {recencyLabel(rec.daysSinceLastPractice)} · {rec.recentAccuracy}% recent accuracy
+                        </span>
+                      </div>
+                      <MasteryBar value={rec.masteryScore} />
+                    </div>
+                  </div>
+                  <Link
+                    href={`/practice?subtopicId=${rec.subtopicId}`}
+                    className="shrink-0 inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Review
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Per-Topic Performance */}
         {subtopicStats.length > 0 && (
