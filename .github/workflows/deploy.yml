@@ -46,6 +46,8 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      packages: read
     steps:
       - name: Set up SSH key
         run: |
@@ -54,10 +56,10 @@ jobs:
           chmod 600 ~/.ssh/vps_key
 
       - name: Deploy to VPS
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=no paperclip@${{ secrets.VPS_HOST }} << 'DEPLOY'
-            set -e
-            cd /tmp/learnforge && git pull origin main
-            docker build -t learnforge:latest .
-            docker service update --image learnforge:latest --force learnforge
-          DEPLOY
+          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=no paperclip@${{ secrets.VPS_HOST }} \
+            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin && \
+             docker pull ghcr.io/${{ github.repository }}:latest && \
+             docker service update --image ghcr.io/${{ github.repository }}:latest --force learnforge"
