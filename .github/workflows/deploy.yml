@@ -55,5 +55,9 @@ jobs:
 
       - name: Deploy to VPS
         run: |
-          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=no paperclip@${{ secrets.VPS_HOST }} \
-            "docker service update --image ghcr.io/${{ github.repository }}:latest --force learnforge"
+          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=no paperclip@${{ secrets.VPS_HOST }} << 'DEPLOY'
+            set -e
+            cd /tmp/learnforge && git pull origin main
+            docker build -t learnforge:latest .
+            docker service update --image learnforge:latest --force learnforge
+          DEPLOY
