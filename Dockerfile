@@ -32,9 +32,14 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma client and migrations
+# Copy Prisma schema, config, and generated client
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src/generated ./src/generated
+COPY --from=builder /app/package.json ./package.json
+
+# Install prisma CLI + seed dependencies for db push and seeding at startup
+RUN npm install prisma@7.6.0 @prisma/adapter-pg@7.6.0 dotenv tsx bcryptjs --no-save
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

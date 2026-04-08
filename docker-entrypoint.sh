@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "[entrypoint] Running database migrations..."
-npx prisma migrate deploy
+echo "[entrypoint] Pushing database schema..."
+npx prisma db push --skip-generate
 
 echo "[entrypoint] Checking if seed is needed..."
 SUBJECT_COUNT=$(node -e "
