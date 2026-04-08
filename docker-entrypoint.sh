@@ -16,7 +16,7 @@ client.connect()
 
 if [ "$SUBJECT_COUNT" = "0" ]; then
   echo "[entrypoint] Seeding database..."
-  npx prisma db seed
+  npx prisma db seed || echo "[entrypoint] Seed failed (non-fatal), continuing..."
 else
   echo "[entrypoint] Database already seeded ($SUBJECT_COUNT subjects), skipping."
 fi
