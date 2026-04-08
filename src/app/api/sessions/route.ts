@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-auth";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { z } from "zod";
 import { NextRequest } from "next/server";
+
+const CreateSessionSchema = z.object({
+  subtopicId: z.string().uuid("subtopicId must be a valid UUID"),
+});
 
 // POST /api/sessions — Start a new practice session for a subtopic
 export async function POST(request: NextRequest) {
@@ -11,12 +17,24 @@ export async function POST(request: NextRequest) {
     return e as Response;
   }
 
-  const body = await request.json();
-  const { subtopicId } = body;
+  const limited = checkRateLimit(`sessions:create:${userId}`, 20, 60_000);
+  if (limited) return limited;
 
-  if (!subtopicId) {
-    return Response.json({ error: "subtopicId is required" }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+
+  const parsed = CreateSessionSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 }
+    );
+  }
+  const { subtopicId } = parsed.data;
 
   const subtopic = await prisma.subtopic.findUnique({
     where: { id: subtopicId },
@@ -42,6 +60,11 @@ export async function POST(request: NextRequest) {
   return Response.json(session, { status: 201 });
 }
 
+const SessionQuerySchema = z.object({
+  subtopicId: z.string().uuid().optional(),
+  status: z.enum(["ACTIVE", "COMPLETED", "ABANDONED"]).optional(),
+});
+
 // GET /api/sessions — List sessions for the authenticated user
 export async function GET(request: NextRequest) {
   let userId: string;
@@ -52,8 +75,18 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl;
-  const subtopicId = searchParams.get("subtopicId");
-  const status = searchParams.get("status");
+  const parsed = SessionQuerySchema.safeParse({
+    subtopicId: searchParams.get("subtopicId") ?? undefined,
+    status: searchParams.get("status") ?? undefined,
+  });
+
+  if (!parsed.success) {
+    return Response.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 }
+    );
+  }
+  const { subtopicId, status } = parsed.data;
 
   const where: Record<string, string> = { userId };
   if (subtopicId) where.subtopicId = subtopicId;

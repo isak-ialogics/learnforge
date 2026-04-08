@@ -1,9 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-auth";
 import { adjustDifficulty, updateStreak } from "@/lib/practice-engine";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { z } from "zod";
 import type { NextRequest } from "next/server";
 
 type Ctx = RouteContext<"/api/sessions/[sessionId]/answer">;
+
+const AnswerSchema = z.object({
+  questionId: z.string().uuid("questionId must be a valid UUID"),
+  answer: z.string().min(1, "answer is required").max(500),
+});
 
 // POST /api/sessions/:sessionId/answer — Submit an answer
 export async function POST(req: NextRequest, ctx: Ctx) {
@@ -14,16 +21,30 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return e as Response;
   }
 
-  const { sessionId } = await ctx.params;
-  const body = await req.json();
-  const { questionId, answer } = body;
+  const limited = checkRateLimit(`sessions:answer:${userId}`, 120, 60_000);
+  if (limited) return limited;
 
-  if (!questionId || answer === undefined) {
+  const { sessionId } = await ctx.params;
+
+  if (!z.string().uuid().safeParse(sessionId).success) {
+    return Response.json({ error: "Invalid sessionId" }, { status: 400 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = AnswerSchema.safeParse(body);
+  if (!parsed.success) {
     return Response.json(
-      { error: "questionId and answer are required" },
+      { error: parsed.error.issues[0].message },
       { status: 400 }
     );
   }
+  const { questionId, answer } = parsed.data;
 
   const session = await prisma.practiceSession.findUnique({
     where: { id: sessionId, userId },
@@ -62,8 +83,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   // Evaluate answer
   const isCorrect =
-    answer.toString().trim().toUpperCase() ===
-    question.answer.trim().toUpperCase();
+    answer.trim().toUpperCase() === question.answer.trim().toUpperCase();
 
   // Update streak and difficulty
   const newStreak = updateStreak(session.streak, isCorrect);
@@ -71,12 +91,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const resetStreak =
     newDifficulty !== session.currentDifficulty ? 0 : newStreak;
 
-  const [sessionAnswer, updatedSession] = await prisma.$transaction([
+  const [, updatedSession] = await prisma.$transaction([
     prisma.sessionAnswer.create({
       data: {
         sessionId,
         questionId,
-        givenAnswer: answer.toString(),
+        givenAnswer: answer,
         isCorrect,
       },
     }),

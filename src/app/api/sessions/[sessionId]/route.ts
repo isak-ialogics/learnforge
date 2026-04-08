@@ -1,8 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/api-auth";
+import { z } from "zod";
 import type { NextRequest } from "next/server";
 
 type Ctx = RouteContext<"/api/sessions/[sessionId]">;
+
+const PatchSessionSchema = z.object({
+  status: z.enum(["COMPLETED", "ABANDONED"], {
+    message: "status must be COMPLETED or ABANDONED",
+  }),
+});
 
 // GET /api/sessions/:sessionId — Get session details
 export async function GET(req: NextRequest, ctx: Ctx) {
@@ -45,15 +52,22 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   const { sessionId } = await ctx.params;
-  const body = await req.json();
-  const { status } = body;
 
-  if (!status || !["COMPLETED", "ABANDONED"].includes(status)) {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = PatchSessionSchema.safeParse(body);
+  if (!parsed.success) {
     return Response.json(
-      { error: "status must be COMPLETED or ABANDONED" },
+      { error: parsed.error.issues[0].message },
       { status: 400 }
     );
   }
+  const { status } = parsed.data;
 
   const session = await prisma.practiceSession.findUnique({
     where: { id: sessionId, userId },
