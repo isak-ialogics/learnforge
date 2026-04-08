@@ -1,12 +1,21 @@
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api-auth";
 import { calculateMasteryScore, needsReview } from "@/lib/practice-engine";
 
 const RECENT_SESSION_COUNT = 3; // sessions to consider for recent accuracy
 const MAX_RECOMMENDATIONS = 5;
 
-// GET /api/dashboard — Aggregated learner stats across all sessions
+// GET /api/dashboard — Aggregated learner stats for the authenticated user
 export async function GET() {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch (e) {
+    return e as Response;
+  }
+
   const sessions = await prisma.practiceSession.findMany({
+    where: { userId },
     include: {
       subtopic: {
         include: { topic: { include: { subject: true } } },
@@ -85,7 +94,6 @@ export async function GET() {
   }));
 
   // Spaced repetition: compute recommendations
-  // Group completed sessions by subtopic (sessions are already sorted newest-first)
   const completedBySubtopic = new Map<
     string,
     { session: typeof sessions[number]; accuracy: number }[]
@@ -139,7 +147,6 @@ export async function GET() {
     }
   }
 
-  // Sort by mastery score ascending (most urgent first)
   recommendations.sort((a, b) => a.masteryScore - b.masteryScore);
 
   return Response.json({

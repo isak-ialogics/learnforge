@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api-auth";
 import { adjustDifficulty, updateStreak } from "@/lib/practice-engine";
 import type { NextRequest } from "next/server";
 
@@ -6,6 +7,13 @@ type Ctx = RouteContext<"/api/sessions/[sessionId]/answer">;
 
 // POST /api/sessions/:sessionId/answer — Submit an answer
 export async function POST(req: NextRequest, ctx: Ctx) {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch (e) {
+    return e as Response;
+  }
+
   const { sessionId } = await ctx.params;
   const body = await req.json();
   const { questionId, answer } = body;
@@ -18,7 +26,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const session = await prisma.practiceSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId },
   });
 
   if (!session) {
@@ -60,11 +68,9 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   // Update streak and difficulty
   const newStreak = updateStreak(session.streak, isCorrect);
   const newDifficulty = adjustDifficulty(session.currentDifficulty, newStreak);
-  // Reset streak to 0 after difficulty adjustment
   const resetStreak =
     newDifficulty !== session.currentDifficulty ? 0 : newStreak;
 
-  // Save answer and update session in a transaction
   const [sessionAnswer, updatedSession] = await prisma.$transaction([
     prisma.sessionAnswer.create({
       data: {

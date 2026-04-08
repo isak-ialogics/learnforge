@@ -7,6 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String
+  hashedPassword String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  practiceSessions PracticeSession[]
+}
+
 model Subject {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -72,6 +83,8 @@ enum QuestionType {
 
 model PracticeSession {
   id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   subtopicId      String
   subtopic        Subtopic      @relation(fields: [subtopicId], references: [id], onDelete: Cascade)
   currentDifficulty Int         @default(3) // adaptive difficulty level
@@ -85,6 +98,7 @@ model PracticeSession {
 
   answers         SessionAnswer[]
 
+  @@index([userId])
   @@index([subtopicId])
   @@index([status])
 }

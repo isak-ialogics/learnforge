@@ -1,14 +1,22 @@
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api-auth";
 import type { NextRequest } from "next/server";
 
 type Ctx = RouteContext<"/api/sessions/[sessionId]">;
 
 // GET /api/sessions/:sessionId — Get session details
-export async function GET(_req: NextRequest, ctx: Ctx) {
+export async function GET(req: NextRequest, ctx: Ctx) {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch (e) {
+    return e as Response;
+  }
+
   const { sessionId } = await ctx.params;
 
   const session = await prisma.practiceSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId },
     include: {
       subtopic: {
         include: { topic: { include: { subject: true } } },
@@ -29,6 +37,13 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 
 // PATCH /api/sessions/:sessionId — Complete or abandon a session
 export async function PATCH(req: NextRequest, ctx: Ctx) {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch (e) {
+    return e as Response;
+  }
+
   const { sessionId } = await ctx.params;
   const body = await req.json();
   const { status } = body;
@@ -41,7 +56,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   const session = await prisma.practiceSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId },
   });
 
   if (!session) {

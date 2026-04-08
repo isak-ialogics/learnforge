@@ -1,14 +1,22 @@
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api-auth";
 import type { NextRequest } from "next/server";
 
 type Ctx = RouteContext<"/api/sessions/[sessionId]/next">;
 
 // GET /api/sessions/:sessionId/next — Get the next question for this session
-export async function GET(_req: NextRequest, ctx: Ctx) {
+export async function GET(req: NextRequest, ctx: Ctx) {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch (e) {
+    return e as Response;
+  }
+
   const { sessionId } = await ctx.params;
 
   const session = await prisma.practiceSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId },
     include: {
       answers: { select: { questionId: true } },
     },

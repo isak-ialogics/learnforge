@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 
 const QuestionType = {
   MULTIPLE_CHOICE: "MULTIPLE_CHOICE" as const,
@@ -35,6 +36,19 @@ async function upsertQuestion(q: QuestionSeed): Promise<{ wasCreated: boolean }>
 }
 
 async function main() {
+  // --- Demo user ---
+  const demoEmail = "demo@learnforge.dev";
+  const existingDemo = await prisma.user.findUnique({ where: { email: demoEmail } });
+  if (!existingDemo) {
+    const hashedPassword = await bcrypt.hash("demo1234", 12);
+    await prisma.user.create({
+      data: { name: "Demo User", email: demoEmail, hashedPassword },
+    });
+    console.log(`Demo user created: ${demoEmail} / demo1234`);
+  } else {
+    console.log(`Demo user already exists: ${demoEmail}`);
+  }
+
   // --- Mathematics ---
   const maths = await prisma.subject.upsert({
     where: { name: "Mathematics" },
