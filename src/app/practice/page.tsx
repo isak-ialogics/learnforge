@@ -61,13 +61,24 @@ function PracticeContent() {
 
   async function startSession(subtopicId: string) {
     setStarting(subtopicId);
-    const res = await fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subtopicId }),
-    });
-    const session = await res.json();
-    router.push(`/practice/${session.id}`);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subtopicId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setFetchError(err.error || "Failed to start session");
+        setStarting(null);
+        return;
+      }
+      const session = await res.json();
+      router.push(`/practice/${session.id}`);
+    } catch {
+      setFetchError("Failed to start session. Please try again.");
+      setStarting(null);
+    }
   }
 
   if (loading || (preselectedSubtopicId && starting)) {

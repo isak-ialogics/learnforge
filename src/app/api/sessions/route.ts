@@ -5,7 +5,7 @@ import { z } from "zod";
 import { NextRequest } from "next/server";
 
 const CreateSessionSchema = z.object({
-  subtopicId: z.string().uuid("subtopicId must be a valid UUID"),
+  subtopicId: z.string().min(1, "subtopicId is required"),
 });
 
 // POST /api/sessions — Start a new practice session for a subtopic
