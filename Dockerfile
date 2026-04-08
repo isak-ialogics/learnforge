@@ -39,7 +39,7 @@ COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/package.json ./package.json
 
 # Install prisma CLI + seed dependencies for db push and seeding at startup
-RUN npm install prisma@7.6.0 @prisma/adapter-pg@7.6.0 tsx bcryptjs --no-save
+RUN npm install prisma@7.6.0 @prisma/adapter-pg@7.6.0 pg tsx bcryptjs --no-save
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

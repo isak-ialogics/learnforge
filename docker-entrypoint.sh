@@ -6,11 +6,12 @@ npx prisma db push
 
 echo "[entrypoint] Checking if seed is needed..."
 SUBJECT_COUNT=$(node -e "
-const { PrismaClient } = require('./src/generated/prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-const prisma = new PrismaClient({ adapter });
-prisma.subject.count().then(n => { console.log(n); prisma.\$disconnect(); }).catch(() => { console.log(0); });
+const { Client } = require('pg');
+const client = new Client({ connectionString: process.env.DATABASE_URL });
+client.connect()
+  .then(() => client.query('SELECT COUNT(*) FROM \"Subject\"'))
+  .then(r => { console.log(r.rows[0].count); return client.end(); })
+  .catch(() => { console.log('0'); process.exit(0); });
 ")
 
 if [ "$SUBJECT_COUNT" = "0" ]; then
