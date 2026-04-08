@@ -28,13 +28,26 @@ function PracticeContent() {
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [starting, setStarting] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/subjects")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
-        setSubjects(data);
+        if (Array.isArray(data)) {
+          setSubjects(data);
+        } else {
+          setFetchError(data.error ?? "Unexpected response from server.");
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch subjects:", err);
+        setFetchError("Could not load subjects. Please refresh the page.");
         setLoading(false);
       });
   }, []);
@@ -65,6 +78,14 @@ function PracticeContent() {
             ? "Starting recommended session..."
             : "Loading subjects..."}
         </p>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg text-red-500">{fetchError}</p>
       </div>
     );
   }
