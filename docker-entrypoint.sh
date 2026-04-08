@@ -2,7 +2,7 @@
 set -e
 
 echo "[entrypoint] Pushing database schema..."
-npx prisma db push --skip-generate
+npx prisma db push
 
 echo "[entrypoint] Checking if seed is needed..."
 SUBJECT_COUNT=$(node -e "
